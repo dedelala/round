@@ -10,10 +10,12 @@ import (
 
 // Terminal escape sequences.
 var (
-	hideCursor     = []byte{27, '[', '?', '2', '5', 'l'}
-	showCursor     = []byte{27, '[', '?', '2', '5', 'h'}
-	saveCursor     = []byte{27, '[', 's'}
-	clearFromSaved = []byte{27, '[', 'u', 27, '[', 'K'}
+	hide      = []byte{27, '[', '?', '2', '5', 'l'}
+	show      = []byte{27, '[', '?', '2', '5', 'h'}
+	save      = []byte{27, '[', 's'}
+	clear     = []byte{27, '[', 'u', 27, '[', 'K'}
+	saveHide  = append(save, hide...)
+	clearShow = append(clear, show...)
 )
 
 // FileWriter is an io.Writer that also has an Fd.
@@ -37,7 +39,7 @@ func NewSpinMe(out FileWriter, s Style) SpinMe {
 		return SpinMe{out, "", nil, nil}
 	}
 	u := SpinMe{out, s.Frames[0], &sync.Mutex{}, time.NewTicker(s.Rate)}
-	u.out.Write(append(append(saveCursor, hideCursor...), u.now...))
+	u.out.Write(append(saveHide, u.now...))
 	go u.writeRound(s.Frames)
 	return u
 }
@@ -49,7 +51,7 @@ func (u *SpinMe) writeRound(baby []string) {
 		f = (f + 1) % len(baby)
 		u.now = baby[f]
 		u.mu.Lock()
-		u.out.Write(append(clearFromSaved, u.now...))
+		u.out.Write(append(clear, u.now...))
 		u.mu.Unlock()
 	}
 }
@@ -60,9 +62,9 @@ func (u *SpinMe) Write(p []byte) (int, error) {
 		return u.out.Write(p)
 	}
 	u.mu.Lock()
-	u.out.Write(clearFromSaved)
+	u.out.Write(clear)
 	n, err := u.out.Write(p)
-	u.out.Write(append(saveCursor, u.now...))
+	u.out.Write(append(save, u.now...))
 	u.mu.Unlock()
 	return n, err
 }
@@ -73,6 +75,6 @@ func (u *SpinMe) Close() error {
 		return nil
 	}
 	u.tick.Stop()
-	u.out.Write(append(clearFromSaved, showCursor...))
+	u.out.Write(clearShow)
 	return nil
 }
