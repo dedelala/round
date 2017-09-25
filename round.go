@@ -29,7 +29,7 @@ type SpinMe struct {
 	out  FileWriter
 	now  string
 	mu   *sync.Mutex
-	tick *time.Ticker
+	stop chan bool
 }
 
 // NewSpinMe creates a SpinMe and sets it spinning. It spins until it is closed.
@@ -38,21 +38,27 @@ func NewSpinMe(out FileWriter, s Style) SpinMe {
 	if !terminal.IsTerminal(int(out.Fd())) || len(s.Frames) == 0 || s.Rate == time.Duration(0) {
 		return SpinMe{out, "", nil, nil}
 	}
-	u := SpinMe{out, s.Frames[0], &sync.Mutex{}, time.NewTicker(s.Rate)}
+	u := SpinMe{out, s.Frames[0], &sync.Mutex{}, make(chan bool)}
 	u.out.Write(append(saveHide, u.now...))
-	go u.writeRound(s.Frames)
+	go u.writeRound(s.Frames, time.NewTicker(s.Rate))
 	return u
 }
 
 // writeRound spins the spinner right round. Like a record, baby.
-func (u *SpinMe) writeRound(baby []string) {
+func (u *SpinMe) writeRound(baby []string, rightRound *time.Ticker) {
 	var f int
-	for _ = range u.tick.C {
-		f = (f + 1) % len(baby)
-		u.now = baby[f]
-		u.mu.Lock()
-		u.out.Write(append(clear, u.now...))
-		u.mu.Unlock()
+	for {
+		select {
+		case <-rightRound.C:
+			f = (f + 1) % len(baby)
+			u.mu.Lock()
+			u.now = baby[f]
+			u.out.Write(append(clear, u.now...))
+			u.mu.Unlock()
+		case <-u.stop:
+			rightRound.Stop()
+			break
+		}
 	}
 }
 
@@ -74,7 +80,9 @@ func (u *SpinMe) Close() error {
 	if u.mu == nil {
 		return nil
 	}
-	u.tick.Stop()
+	close(u.stop)
+	u.mu.Lock()
 	u.out.Write(clearShow)
+	u.mu.Unlock()
 	return nil
 }
