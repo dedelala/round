@@ -11,7 +11,9 @@ import "github.com/dedelala/round"
 
 ```go
 w := round.NewSpinMe(os.Stdout, round.Pipe)
-defer w.close()
+defer w.Close()
+
+fmt.Fprintln(&w, "Like a record!")
 ```
 
 ## Built-In Styles!
