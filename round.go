@@ -56,6 +56,9 @@ func (u *SpinMe) writeRound(baby []string) {
 
 // Write writes to out, moving the spinner to the end of what's written.
 func (u *SpinMe) Write(p []byte) (int, error) {
+	if u.mu == nil {
+		return u.out.Write(p)
+	}
 	u.mu.Lock()
 	u.out.Write(clearFromSaved)
 	n, err := u.out.Write(p)
@@ -66,6 +69,9 @@ func (u *SpinMe) Write(p []byte) (int, error) {
 
 // Close will stop and remove the spinner.
 func (u *SpinMe) Close() error {
+	if u.mu == nil {
+		return nil
+	}
 	u.tick.Stop()
 	u.out.Write(append(clearFromSaved, showCursor...))
 	return nil
