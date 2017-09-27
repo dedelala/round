@@ -28,7 +28,7 @@ type Style struct {
 
 // NewScroller creates a Style for a text scroller.
 func NewScroller(width int, format, text string) Style {
-	text = fmt.Sprintf(fmt.Sprintf("%%%vv%%v%%%vv", width, width), "", text, "")
+	text = fmt.Sprintf(fmt.Sprintf("%%%vv%%v%%%[1]v[1]v", width), "", text)
 	s := Style{[]string{}, 90 * time.Millisecond}
 	for i := 0; i < len(text)-width; i++ {
 		s.Frames = append(s.Frames, fmt.Sprintf(format, text[i:i+width]))
