@@ -1,3 +1,4 @@
+// Package round is a command line spinner library. Start one with NewSpinMe.
 package round
 
 import (
@@ -62,7 +63,7 @@ func (u *SpinMe) writeRound(baby []string, rightRound *time.Ticker) {
 	}
 }
 
-// Write writes to out, moving the spinner to the end of what's written.
+// Write writes to the underlying FileWriter, moving the spinner to the end of what's written.
 func (u *SpinMe) Write(p []byte) (int, error) {
 	if u.mu == nil {
 		return u.out.Write(p)
@@ -75,7 +76,7 @@ func (u *SpinMe) Write(p []byte) (int, error) {
 	return n, err
 }
 
-// Close will stop and remove the spinner.
+// Close will stop and remove the spinner. It will not close the underlying FileWriter.
 func (u *SpinMe) Close() error {
 	if u.mu == nil {
 		return nil
