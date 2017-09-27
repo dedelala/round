@@ -13,16 +13,19 @@ import "github.com/dedelala/round"
 ```go
 w := round.NewSpinMe(os.Stdout, round.Pipe)
 ```
+os.Stdout could be any io.Writer with an Fd. If it's not a terminal the spinner does nothing.
 
 ## Write to It
 ```go
 fmt.Fprintln(&w, "Like a record!")
 ```
+Don't write directly to the underlying writer before the spinner is closed. There be dragons.
 
 ## Make It Stop
 ```go
 w.Close()
 ```
+It _does not_ close the underlying writer.
 
 ## Built-In Styles!
 
