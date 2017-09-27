@@ -2,18 +2,26 @@
 A Go command line spinner library.
 
 ## Get It
+`go get github.com/dedelala/round`
 
+## Use It
 ```go
 import "github.com/dedelala/round"
 ```
 
 ## Make It Go
-
 ```go
 w := round.NewSpinMe(os.Stdout, round.Pipe)
-defer w.Close()
+```
 
+## Write to It
+```go
 fmt.Fprintln(&w, "Like a record!")
+```
+
+## Make It Stop
+```go
+w.Close()
 ```
 
 ## Built-In Styles!
