@@ -11,7 +11,7 @@ import "github.com/dedelala/round"
 
 ## Make It Go
 ```go
-round.Start(round.Pipe)
+round.Go(round.Pipe)
 ```
 
 ## Write to It
@@ -24,7 +24,6 @@ Don't write directly to os.Stdout or os.Stderr while a spinner is running. There
 ```go
 round.Stop()
 ```
-Also, you don't need to stop it to start a new one.
 
 ## Built-In Styles!
 

@@ -19,10 +19,14 @@ var (
 	// Stderr is a spin-safe version of os.Stderr
 	Stderr io.Writer
 
-	// Spin Control
-	out  io.Writer
+	// Spinner frames and control bytes will be written on out
+	out io.Writer
+
+	// spin is the current spinner
 	spin *spinMe
-	mu   = spinit()
+
+	// mu ensures clean output
+	mu = &sync.Mutex{}
 
 	// Terminal escape sequences.
 	hide      = []byte{27, '[', '?', '2', '5', 'l'}
@@ -33,8 +37,8 @@ var (
 	clearShow = append(clear, show...)
 )
 
-// Start starts a spinner.
-func Start(s Style) {
+// Go makes a spinner go.
+func Go(s Style) {
 	if out == nil {
 		return
 	}
@@ -94,8 +98,8 @@ func (u *spinMe) writeRound(baby []string, rightRound *time.Ticker) {
 	}
 }
 
-// spinit is the init for the spin it.
-func spinit() *sync.Mutex {
+// init sets up globals and a goroutine to catch interrupts.
+func init() {
 	o := term.IsTerminal(int(os.Stdout.Fd()))
 	e := term.IsTerminal(int(os.Stderr.Fd()))
 	switch {
@@ -122,6 +126,4 @@ func spinit() *sync.Mutex {
 		<-sigs
 		Stop()
 	}()
-
-	return &sync.Mutex{}
 }
