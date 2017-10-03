@@ -55,16 +55,17 @@ func Stop() {
 	out.Write(clearShow)
 }
 
+// blockingWriter will block on spin's writeRound
 type blockingWriter struct {
 	out io.Writer
 }
 
-// Write writes to the underlying Writer, moving the spinner to the end of what's written.
+// Write writes out, moving the spinner to the end of what's written.
 func (w *blockingWriter) Write(p []byte) (int, error) {
 	mu.Lock()
-	w.out.Write(clear)
+	out.Write(clear)
 	n, err := w.out.Write(p)
-	w.out.Write(append(save, spin.now...))
+	out.Write(append(save, spin.now...))
 	mu.Unlock()
 	return n, err
 }
