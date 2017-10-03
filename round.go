@@ -33,38 +33,6 @@ var (
 	clearShow = append(clear, show...)
 )
 
-// spinit is the init for the spin it.
-func spinit() *sync.Mutex {
-	o := term.IsTerminal(int(os.Stdout.Fd()))
-	e := term.IsTerminal(int(os.Stderr.Fd()))
-	switch {
-	case o && e:
-		Stdout = &blockingWriter{os.Stdout}
-		Stderr = &blockingWriter{os.Stderr}
-		out = os.Stdout
-	case o:
-		Stdout = &blockingWriter{os.Stdout}
-		Stderr = os.Stderr
-		out = os.Stdout
-	case e:
-		Stdout = os.Stdout
-		Stderr = &blockingWriter{os.Stderr}
-		out = os.Stderr
-	default:
-		Stdout = os.Stdout
-		Stderr = os.Stderr
-	}
-
-	sigs := make(chan os.Signal)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		<-sigs
-		Stop()
-	}()
-
-	return &sync.Mutex{}
-}
-
 // Start starts a spinner.
 func Start(s Style) {
 	if out == nil {
@@ -123,4 +91,36 @@ func (u *spinMe) writeRound(baby []string, rightRound *time.Ticker) {
 			break
 		}
 	}
+}
+
+// spinit is the init for the spin it.
+func spinit() *sync.Mutex {
+	o := term.IsTerminal(int(os.Stdout.Fd()))
+	e := term.IsTerminal(int(os.Stderr.Fd()))
+	switch {
+	case o && e:
+		Stdout = &blockingWriter{os.Stdout}
+		Stderr = &blockingWriter{os.Stderr}
+		out = os.Stdout
+	case o:
+		Stdout = &blockingWriter{os.Stdout}
+		Stderr = os.Stderr
+		out = os.Stdout
+	case e:
+		Stdout = os.Stdout
+		Stderr = &blockingWriter{os.Stderr}
+		out = os.Stderr
+	default:
+		Stdout = os.Stdout
+		Stderr = os.Stderr
+	}
+
+	sigs := make(chan os.Signal)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-sigs
+		Stop()
+	}()
+
+	return &sync.Mutex{}
 }
