@@ -1,16 +1,30 @@
-// Package round is a command line spinner library. Start one with NewSpinMe.
+// Package round is a command line spinner. Start one with Start.
 package round
 
 import (
 	"io"
+	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 	"time"
 
-	"golang.org/x/crypto/ssh/terminal"
+	term "golang.org/x/crypto/ssh/terminal"
 )
 
-// Terminal escape sequences.
 var (
+	// Stdout is a spin-safe version of os.Stdout
+	Stdout io.Writer
+
+	// Stderr is a spin-safe version of os.Stderr
+	Stderr io.Writer
+
+	// Spin Control
+	out  io.Writer
+	spin *spinMe
+	mu   = spinit()
+
+	// Terminal escape sequences.
 	hide      = []byte{27, '[', '?', '2', '5', 'l'}
 	show      = []byte{27, '[', '?', '2', '5', 'h'}
 	save      = []byte{27, '[', 's'}
@@ -19,71 +33,94 @@ var (
 	clearShow = append(clear, show...)
 )
 
-// FileWriter is an io.Writer that also has an Fd.
-type FileWriter interface {
-	io.Writer
-	Fd() uintptr
+// spinit is the init for the spin it.
+func spinit() *sync.Mutex {
+	o := term.IsTerminal(int(os.Stdout.Fd()))
+	e := term.IsTerminal(int(os.Stderr.Fd()))
+	switch {
+	case o && e:
+		Stdout = &blockingWriter{os.Stdout}
+		Stderr = &blockingWriter{os.Stderr}
+		out = os.Stdout
+	case o:
+		Stdout = &blockingWriter{os.Stdout}
+		Stderr = os.Stderr
+		out = os.Stdout
+	case e:
+		Stdout = os.Stdout
+		Stderr = &blockingWriter{os.Stderr}
+		out = os.Stderr
+	default:
+		Stdout = os.Stdout
+		Stderr = os.Stderr
+	}
+
+	sigs := make(chan os.Signal)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-sigs
+		Stop()
+	}()
+
+	return &sync.Mutex{}
 }
 
-// SpinMe goes right round. It's an io.WriteCloser.
-type SpinMe struct {
-	out  FileWriter
+// Start starts a spinner.
+func Start(s Style) {
+	if out == nil {
+		return
+	}
+	if spin != nil {
+		Stop()
+	}
+	spin = &spinMe{s.Frames[0], make(chan bool)}
+	out.Write(saveHide)
+	go spin.writeRound(s.Frames, time.NewTicker(s.Rate))
+}
+
+// Stop will stop and remove the spinner.
+func Stop() {
+	if out == nil || spin == nil {
+		return
+	}
+	spin.stop <- true
+	out.Write(clearShow)
+}
+
+type blockingWriter struct {
+	out io.Writer
+}
+
+// Write writes to the underlying Writer, moving the spinner to the end of what's written.
+func (w *blockingWriter) Write(p []byte) (int, error) {
+	mu.Lock()
+	w.out.Write(clear)
+	n, err := w.out.Write(p)
+	w.out.Write(append(save, spin.now...))
+	mu.Unlock()
+	return n, err
+}
+
+// spinMe goes right round.
+type spinMe struct {
 	now  string
-	mu   *sync.Mutex
 	stop chan bool
 }
 
-// NewSpinMe creates a SpinMe and sets it spinning. It spins until it is closed.
-// If the FileWriter is not a terminal, the spinner is bypassed.
-func NewSpinMe(out FileWriter, s Style) SpinMe {
-	if !terminal.IsTerminal(int(out.Fd())) || len(s.Frames) == 0 || s.Rate == time.Duration(0) {
-		return SpinMe{out, "", nil, nil}
-	}
-	u := SpinMe{out, s.Frames[0], &sync.Mutex{}, make(chan bool)}
-	u.out.Write(append(saveHide, u.now...))
-	go u.writeRound(s.Frames, time.NewTicker(s.Rate))
-	return u
-}
-
 // writeRound spins the spinner right round. Like a record, baby.
-func (u *SpinMe) writeRound(baby []string, rightRound *time.Ticker) {
+func (u *spinMe) writeRound(baby []string, rightRound *time.Ticker) {
 	var f int
 	for {
 		select {
 		case <-rightRound.C:
 			f = (f + 1) % len(baby)
-			u.mu.Lock()
+			mu.Lock()
 			u.now = baby[f]
-			u.out.Write(append(clear, u.now...))
-			u.mu.Unlock()
+			out.Write(append(clear, u.now...))
+			mu.Unlock()
 		case <-u.stop:
 			rightRound.Stop()
 			break
 		}
 	}
-}
-
-// Write writes to the underlying FileWriter, moving the spinner to the end of what's written.
-func (u *SpinMe) Write(p []byte) (int, error) {
-	if u.mu == nil {
-		return u.out.Write(p)
-	}
-	u.mu.Lock()
-	u.out.Write(clear)
-	n, err := u.out.Write(p)
-	u.out.Write(append(save, u.now...))
-	u.mu.Unlock()
-	return n, err
-}
-
-// Close will stop and remove the spinner. It will not close the underlying FileWriter.
-func (u *SpinMe) Close() error {
-	if u.mu == nil {
-		return nil
-	}
-	close(u.stop)
-	u.mu.Lock()
-	u.out.Write(clearShow)
-	u.mu.Unlock()
-	return nil
 }
