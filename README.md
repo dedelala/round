@@ -11,21 +11,20 @@ import "github.com/dedelala/round"
 
 ## Make It Go
 ```go
-w := round.NewSpinMe(os.Stdout, round.Pipe)
+round.Start(round.Pipe)
 ```
-os.Stdout could be any io.Writer with an Fd. If it's not a terminal the spinner does nothing.
 
 ## Write to It
 ```go
-fmt.Fprintln(&w, "Like a record!")
+fmt.Fprintln(round.Stdout, "Like a record!")
 ```
-Don't write directly to the underlying writer before the spinner is closed. There be dragons.
+Don't write directly to os.Stdout or os.Stderr while a spinner is running. There be dragons.
 
 ## Make It Stop
 ```go
-w.Close()
+round.Stop()
 ```
-It _does not_ close the underlying writer.
+Also, you don't need to stop it to start a new one.
 
 ## Built-In Styles!
 
@@ -40,5 +39,5 @@ Style    | Unicode Set
 
 ```go
 s := round.NewScroller(12, "[%v]", "Do Not Panic!")
-w := round.NewSpinMe(os.Stdout, s)
+round.Start(s)
 ```
