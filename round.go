@@ -1,4 +1,10 @@
-// Package round is a command line spinner. Start one with Start.
+// Package round is a command line spinner. Start one with Go.
+//
+// If Stdout is a terminal, the spinner will be written there. If not, Stderr
+// will be checked. If neither, the spinner will quietly do nothing.
+//
+// The exported Stdout and Stderr, if connected to the terminal,  will block
+// against the spinner. Use these instead of the handles in package os.
 package round
 
 import (
@@ -13,22 +19,22 @@ import (
 )
 
 var (
-	// Stdout is a spin-safe version of os.Stdout
+	// Stdout is a spin-safe version of os.Stdout.
 	Stdout io.Writer
 
-	// Stderr is a spin-safe version of os.Stderr
+	// Stderr is a spin-safe version of os.Stderr.
 	Stderr io.Writer
 
-	// Spinner frames and control bytes will be written on out
+	// Spinner frames and control bytes will be written on out.
 	out io.Writer
 
-	// spin is the current spinner
+	// spin is the current spinner.
 	spin *spinMe
 
-	// mu ensures clean output
+	// mu ensures clean output.
 	mu = &sync.Mutex{}
 
-	// Terminal escape sequences.
+	// terminal control bytes.
 	hide      = []byte{27, '[', '?', '2', '5', 'l'}
 	show      = []byte{27, '[', '?', '2', '5', 'h'}
 	save      = []byte{27, '[', 's'}
@@ -37,7 +43,7 @@ var (
 	clearShow = append(clear, show...)
 )
 
-// Go makes a spinner go.
+// Go makes a spinner go. It will Stop first if there is one running already.
 func Go(s Style) {
 	if out == nil {
 		return
