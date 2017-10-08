@@ -38,12 +38,13 @@ round.Stop()
 
 ## Built-In Styles!
 
-Style    | Unicode Set
--------- | -----------
-`Pipe`   | 0020—007F Basic Latin
-`Moon`   | 1F300—1F5FF Miscellaneous Symbols and Pictographs
-`Block`  | 2580—259F Block Elements
-`Hearts` | 1F300—1F5FF Miscellaneous Symbols and Pictographs
+Style    | =  | Unicode Set
+---------|----|--------------
+`Block`  | █  | 2580—259F Block Elements
+`Cylon`  | @  | 0020—007F Basic Latin
+`Hearts` | 💖 | 1F300—1F5FF Miscellaneous Symbols and Pictographs
+`Moon`   | 🌓 | 1F300—1F5FF Miscellaneous Symbols and Pictographs
+`Pipe`   | -  | 0020—007F Basic Latin
 
 ## Make Your Own Scroller
 

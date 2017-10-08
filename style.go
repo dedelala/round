@@ -19,7 +19,7 @@ var Block = Style{
 }
 
 // Cylon is ominous. @ 0020—007F Basic Latin.
-var Cylon = NewBounce(7, "(\x1b[31m%v\x1b[0m)", "(@)")
+var Cylon = NewBouncer(7, "(\x1b[31m%v\x1b[0m)", "(@)")
 
 // Hearts is clearly the best style! 💜 1F300—1F5FF Misc Symbols and Pictographs.
 var Hearts = Style{
@@ -55,8 +55,8 @@ func NewInvertedScroller(width int, format, text string) Style {
 	return s
 }
 
-// NewBounce creates a Style with some text that bounces back and forth.
-func NewBounce(width int, format, text string) Style {
+// NewBouncer creates a Style with some text that bounces back and forth.
+func NewBouncer(width int, format, text string) Style {
 	a := NewScroller(width, format, text)
 	b := NewInvertedScroller(width, format, text)
 	a.Frames = append(a.Frames[1:len(a.Frames)-1], b.Frames[1:len(b.Frames)-1]...)
