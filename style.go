@@ -19,7 +19,7 @@ var Block = Style{
 }
 
 // Cylon is ominous. @ 0020—007F Basic Latin.
-var Cylon = NewBouncer(7, "(\x1b[31m%v\x1b[0m)", "(@)")
+var Cylon = NewBouncer(7, "(\x1b[31m%v\x1b[0m)", "@")
 
 // Hearts is clearly the best style! 💜 1F300—1F5FF Misc Symbols and Pictographs.
 var Hearts = Style{
