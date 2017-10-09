@@ -3,7 +3,7 @@
 // If Stdout is a terminal, the spinner will be written there. If not, Stderr
 // will be checked. If neither, the spinner will quietly do nothing.
 //
-// The exported Stdout and Stderr, if connected to the terminal,  will block
+// The exported Stdout and Stderr, if connected to a terminal, will block
 // against the spinner. Use these instead of the handles in package os.
 package round
 
@@ -35,12 +35,11 @@ var (
 	mu = &sync.Mutex{}
 
 	// terminal control bytes.
-	hide      = []byte{27, '[', '?', '2', '5', 'l'}
-	show      = []byte{27, '[', '?', '2', '5', 'h'}
-	save      = []byte{27, '[', 's'}
-	clear     = []byte{27, '[', 'u', 27, '[', 'K'}
-	saveHide  = append(save, hide...)
-	clearShow = append(clear, show...)
+	hide  = []byte{27, '[', '?', '2', '5', 'l'}
+	show  = []byte{27, '[', '?', '2', '5', 'h'}
+	save  = []byte{27, '[', 's'}
+	load  = []byte{27, '[', 'u'}
+	clear = []byte{27, '[', 'K'}
 )
 
 // Go makes a spinner go. It will Stop first if there is one running already.
@@ -52,7 +51,7 @@ func Go(s Style) {
 		Stop()
 	}
 	spin = &spinMe{s.Frames[0], make(chan bool)}
-	out.Write(saveHide)
+	out.Write(append(save, hide...))
 	go spin.writeRound(s.Frames, time.NewTicker(s.Rate))
 }
 
@@ -62,7 +61,7 @@ func Stop() {
 		return
 	}
 	spin.stop <- true
-	out.Write(clearShow)
+	out.Write(append(clear, show...))
 }
 
 // blockingWriter will block on spin's writeRound
@@ -75,7 +74,7 @@ func (w *blockingWriter) Write(p []byte) (int, error) {
 	mu.Lock()
 	out.Write(clear)
 	n, err := w.out.Write(p)
-	out.Write(append(save, spin.now...))
+	out.Write(append(append(save, spin.now...), load...))
 	mu.Unlock()
 	return n, err
 }
@@ -95,7 +94,8 @@ func (u *spinMe) writeRound(baby []string, rightRound *time.Ticker) {
 			f = (f + 1) % len(baby)
 			mu.Lock()
 			u.now = baby[f]
-			out.Write(append(clear, u.now...))
+			out.Write(append(clear, save...))
+			out.Write(append([]byte(u.now), load...))
 			mu.Unlock()
 		case <-u.stop:
 			rightRound.Stop()
