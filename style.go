@@ -62,3 +62,12 @@ func NewBouncer(width int, format, text string) Style {
 	a.Frames = append(a.Frames[1:len(a.Frames)-1], b.Frames[1:len(b.Frames)-1]...)
 	return a
 }
+
+// NewInvertedBouncer creates a Style just like NewBouncer except it goes in
+// the opposite direction at the start. For the true pedant.
+func NewInvertedBouncer(width int, format, text string) Style {
+	a := NewScroller(width, format, text)
+	b := NewInvertedScroller(width, format, text)
+	a.Frames = append(b.Frames[1:len(a.Frames)-1], a.Frames[1:len(b.Frames)-1]...)
+	return a
+}
