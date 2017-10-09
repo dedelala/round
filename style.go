@@ -36,10 +36,10 @@ var Pipe = Style{[]string{"|", "/", "-", "\\"}, 60 * time.Millisecond}
 // NewScroller creates a Style for a text scroller with the specified width
 // and format. It scrolls from right to left.
 func NewScroller(width int, format, text string) Style {
-	text = fmt.Sprintf(fmt.Sprintf("%%%vv%%v%%%[1]v[1]v", width), "", text)
+	r := []rune(fmt.Sprintf(fmt.Sprintf("%%%vv%%v%%%[1]v[1]v", width), "", text))
 	s := Style{[]string{}, 90 * time.Millisecond}
-	for i := 0; i < len(text)-width; i++ {
-		s.Frames = append(s.Frames, fmt.Sprintf(format, text[i:i+width]))
+	for i := 0; i < len(r)-width; i++ {
+		s.Frames = append(s.Frames, fmt.Sprintf(format, string(r[i:i+width])))
 	}
 	return s
 }
@@ -47,10 +47,10 @@ func NewScroller(width int, format, text string) Style {
 // NewInvertedScroller creates a Style for a text scroller with the specified
 // width and format. It scrolls from left to right.
 func NewInvertedScroller(width int, format, text string) Style {
-	text = fmt.Sprintf(fmt.Sprintf("%%%vv%%v%%%[1]v[1]v", width), "", text)
+	r := []rune(fmt.Sprintf(fmt.Sprintf("%%%vv%%v%%%[1]v[1]v", width), "", text))
 	s := Style{[]string{}, 90 * time.Millisecond}
-	for i := len(text) - width; i >= 0; i-- {
-		s.Frames = append(s.Frames, fmt.Sprintf(format, text[i:i+width]))
+	for i := len(r) - width; i >= 0; i-- {
+		s.Frames = append(s.Frames, fmt.Sprintf(format, string(r[i:i+width])))
 	}
 	return s
 }
