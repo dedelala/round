@@ -47,7 +47,7 @@ go get -u github.com/dedelala/round |go-round hearts
 
 ## just for fun
 
-Note: go-round can be redirected and it still goes round
+go-round can be redirected and it still goes round
 
 ```
 go-round > some-file
