@@ -1,10 +1,10 @@
 // Package round is a command line spinner. Start one with Go.
 //
-// If Stdout is a terminal, the spinner will be written there. If not, Stderr
-// will be checked. If neither, the spinner will quietly do nothing.
+// The package will intelligently decide whether to write spinners on stdout,
+// stderr or neither, depending if a terminal is present.
 //
-// The exported Stdout and Stderr, if connected to a terminal, will block
-// against the spinner. Use these instead of the handles in package os.
+// Wrappers for Stdout and Stderr are provided so as not to interfere with the
+// spinner while running.
 package round
 
 import (
