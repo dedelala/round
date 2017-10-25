@@ -6,31 +6,31 @@ import (
 )
 
 // Style is a spinner style. Any number of frames is allowed, each frame can be any length.
-// The following Styles are supplied: Pipe, Block, Moon, Hearts.
+// The following Styles are supplied: Block, Cylon, Hearts, Moon, Pipe.
 type Style struct {
 	Frames []string
 	Rate   time.Duration
 }
 
-// Block is a good old trusty block thing. █  2580—259F Block Elements.
+// Block is a good old trusty block thing. It uses "█" from 2580—259F Block Elements.
 var Block = Style{
 	[]string{"▏", "▎", "▍", "▌", "▋", "▊", "▉", "█", "▇", "▆", "▅", "▄", "▃", "▂", "▁", ""},
 	60 * time.Millisecond,
 }
 
-// Cylon is ominous. @ 0020—007F Basic Latin.
+// Cylon is ominous. It uses "@" from 0020—007F Basic Latin.
 var Cylon = NewBouncer(7, "\x1b[1m(\x1b[31m%v\x1b[0;1m)\x1b[0m", "@")
 
-// Hearts is clearly the best style! 💜 1F300—1F5FF Misc Symbols and Pictographs.
+// Hearts is clearly the best style! It uses "💜" from 1F300—1F5FF Misc Symbols and Pictographs.
 var Hearts = Style{
 	[]string{"💖💛💚💙💜", "💜💖💛💚💙", "💙💜💖💛💚", "💚💙💜💖💛", "💛💚💙💜💖"},
 	90 * time.Millisecond,
 }
 
-// Moon is a series of moon phases. 🌕 1F300—1F5FF Misc Symbols and Pictographs.
+// Moon is a series of moon phases. It uses "🌕" from 1F300—1F5FF Misc Symbols and Pictographs.
 var Moon = Style{[]string{"🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘"}, 90 * time.Millisecond}
 
-// Pipe is guaranteed to work. | 0020—007F Basic Latin.
+// Pipe is guaranteed to work. It uses "|" from 0020—007F Basic Latin.
 var Pipe = Style{[]string{"|", "/", "-", "\\"}, 60 * time.Millisecond}
 
 // NewScroller creates a Style for a text scroller with the specified width
