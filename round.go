@@ -15,7 +15,7 @@ import (
 	"syscall"
 	"time"
 
-	term "golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 var (
@@ -26,7 +26,7 @@ var (
 	Stderr io.Writer
 
 	// Spinner frames and control bytes will be written on out.
-	out io.Writer
+	out *writer
 
 	// spin is the current spinner.
 	spin *spinMe
@@ -37,8 +37,8 @@ var (
 	// terminal control bytes.
 	hide  = []byte{27, '[', '?', '2', '5', 'l'}
 	show  = []byte{27, '[', '?', '2', '5', 'h'}
-	save  = []byte{27, '[', 's'}
-	load  = []byte{27, '[', 'u'}
+	save  = []byte{27, '7'}
+	load  = []byte{27, '8'}
 	clear = []byte{27, '[', 'K'}
 )
 
@@ -51,7 +51,7 @@ func Go(s Style) {
 		Stop()
 	}
 	spin = &spinMe{s.Frames[0], make(chan bool)}
-	out.Write(append(save, hide...))
+	out.writeAll(save, hide)
 	go spin.writeRound(s.Frames, time.NewTicker(s.Rate))
 }
 
@@ -61,7 +61,21 @@ func Stop() {
 		return
 	}
 	spin.stop <- true
-	out.Write(append(clear, show...))
+	out.writeAll(clear, show)
+}
+
+// writer is for writing out control bytes
+type writer struct {
+	out io.Writer
+}
+
+// write all writes all the bytes, or freaks the heck out
+func (w *writer) writeAll(b ...[]byte) {
+	for _, v := range b {
+		if _, err := w.out.Write(v); err != nil {
+			panic(err)
+		}
+	}
 }
 
 // blockingWriter will block on spin's writeRound
@@ -72,9 +86,9 @@ type blockingWriter struct {
 // Write writes out, moving the spinner to the end of what's written.
 func (w *blockingWriter) Write(p []byte) (int, error) {
 	mu.Lock()
-	out.Write(clear)
+	out.writeAll(clear)
 	n, err := w.out.Write(p)
-	out.Write(append(append(save, spin.now...), load...))
+	out.writeAll(save, []byte(spin.now), load)
 	mu.Unlock()
 	return n, err
 }
@@ -94,33 +108,31 @@ func (u *spinMe) writeRound(baby []string, rightRound *time.Ticker) {
 			f = (f + 1) % len(baby)
 			mu.Lock()
 			u.now = baby[f]
-			out.Write(append(clear, save...))
-			out.Write(append([]byte(u.now), load...))
+			out.writeAll(clear, save, []byte(u.now), load)
 			mu.Unlock()
 		case <-u.stop:
 			rightRound.Stop()
-			break
 		}
 	}
 }
 
 // init sets up globals and a goroutine to catch interrupts.
 func init() {
-	o := term.IsTerminal(int(os.Stdout.Fd()))
-	e := term.IsTerminal(int(os.Stderr.Fd()))
+	o := terminal.IsTerminal(int(os.Stdout.Fd()))
+	e := terminal.IsTerminal(int(os.Stderr.Fd()))
 	switch {
 	case o && e:
 		Stdout = &blockingWriter{os.Stdout}
 		Stderr = &blockingWriter{os.Stderr}
-		out = os.Stdout
+		out = &writer{os.Stdout}
 	case o:
 		Stdout = &blockingWriter{os.Stdout}
 		Stderr = os.Stderr
-		out = os.Stdout
+		out = &writer{os.Stdout}
 	case e:
 		Stdout = os.Stdout
 		Stderr = &blockingWriter{os.Stderr}
-		out = os.Stderr
+		out = &writer{os.Stderr}
 	default:
 		Stdout = os.Stdout
 		Stderr = os.Stderr
