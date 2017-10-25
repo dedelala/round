@@ -138,10 +138,10 @@ func init() {
 		Stderr = os.Stderr
 	}
 
-	sigs := make(chan os.Signal)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	sig := make(chan os.Signal)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
-		<-sigs
+		<-sig
 		Stop()
 	}()
 }

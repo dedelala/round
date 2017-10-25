@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/dedelala/round"
-	exit "github.com/dedelala/sysexits"
+	"github.com/dedelala/sysexits"
 )
 
 func usage() {
@@ -31,12 +31,13 @@ Usage: %[1]v [options] [scroll|bounce] [message...]
 `
 	fmt.Fprintf(os.Stderr, f, os.Args[0])
 	flag.PrintDefaults()
-	os.Exit(exit.Usage)
 }
 
 func main() {
 	round.Go(divineStyle())
-	io.Copy(round.Stdout, os.Stdin)
+	if _, err := io.Copy(round.Stdout, os.Stdin); err != nil {
+		fmt.Fprintln(round.Stderr, err)
+	}
 	round.Stop()
 }
 
@@ -58,6 +59,7 @@ func divineStyle() round.Style {
 	switch flag.Arg(0) {
 	case "help":
 		flag.Usage()
+		os.Exit(sysexits.Usage)
 	case "block":
 		return round.Block
 	case "cylon":
