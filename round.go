@@ -1,147 +1,224 @@
 // Package round is a command line spinner. Start one with Go.
 //
-// The package will intelligently decide whether to write spinners on stdout,
-// stderr or neither, depending if a terminal is present.
+// The package will decide whether to write the spinner to stdout, stderr or
+// neither, depending if a terminal is present.
 //
-// Wrappers for Stdout and Stderr are provided so as not to interfere with the
+// Wrappers for Stdout and Stderr are provided to prevent interference with the
 // spinner while running.
 package round
 
 import (
-	"io"
+	"fmt"
 	"os"
 	"os/signal"
-	"sync"
+	"path/filepath"
+	"strconv"
 	"syscall"
 	"time"
 
+	"github.com/pkg/term"
 	"golang.org/x/crypto/ssh/terminal"
 )
 
-var (
-	// Stdout is a spin-safe version of os.Stdout.
-	Stdout io.Writer
-
-	// Stderr is a spin-safe version of os.Stderr.
-	Stderr io.Writer
-
-	// Spinner frames and control bytes will be written on out.
-	out *writer
-
-	// spin is the current spinner.
-	spin *spinMe
-
-	// mu ensures clean output.
-	mu = &sync.Mutex{}
-
-	// terminal control bytes.
-	hide  = []byte{27, '[', '?', '2', '5', 'l'}
-	show  = []byte{27, '[', '?', '2', '5', 'h'}
-	save  = []byte{27, '7'}
-	load  = []byte{27, '8'}
-	clear = []byte{27, '[', 'K'}
+const (
+	hide  = "\x1b[?25l"
+	show  = "\x1b[?25h"
+	save  = "\x1b7"
+	load  = "\x1b8"
+	clear = "\x1b[K"
+	erase = "\x1b[J"
 )
 
-// Go makes a spinner go. It will Stop first if there is one running already.
-func Go(s Style) {
-	if out == nil {
-		return
-	}
-	if spin != nil {
-		Stop()
-	}
-	spin = &spinMe{s.Frames[0], make(chan bool)}
-	out.writeAll(save, hide)
-	go spin.writeRound(s.Frames, time.NewTicker(s.Rate))
+var (
+	bars     = make(chan bar)
+	enabled  = terminal.IsTerminal(int(os.Stderr.Fd()))
+	progress func(bar)
+	stop     func()
+)
+
+type bar struct {
+	k, v string
 }
 
-// Stop will stop and remove the spinner.
-func Stop() {
-	if out == nil || spin == nil {
-		return
+func update(bs []bar, b bar) []bar {
+	if b.k == "" && b.v == "" {
+		return bs
 	}
-	spin.stop <- true
-	out.writeAll(clear, show)
-}
-
-// writer is for writing out control bytes
-type writer struct {
-	out io.Writer
-}
-
-// write all writes all the bytes, or freaks the heck out
-func (w *writer) writeAll(b ...[]byte) {
-	for _, v := range b {
-		if _, err := w.out.Write(v); err != nil {
-			panic(err)
+	for i, v := range bs {
+		if v.k == b.k {
+			bs[i] = b
+			return bs
 		}
 	}
+	return append(bs, b)
 }
 
-// blockingWriter will block on spin's writeRound
-type blockingWriter struct {
-	out io.Writer
-}
-
-// Write writes out, moving the spinner to the end of what's written.
-func (w *blockingWriter) Write(p []byte) (int, error) {
-	mu.Lock()
-	out.writeAll(clear)
-	n, err := w.out.Write(p)
-	out.writeAll(save, []byte(spin.now), load)
-	mu.Unlock()
-	return n, err
-}
-
-// spinMe goes right round.
-type spinMe struct {
-	now  string
-	stop chan bool
-}
-
-// writeRound spins the spinner right round. Like a record, baby.
-func (u *spinMe) writeRound(baby []string, rightRound *time.Ticker) {
-	var f int
+func pass(recv <-chan bar, send chan<- bar) {
+	bs := []bar{}
 	for {
+		var b bar
+		if len(bs) > 0 {
+			b = bs[0]
+		}
 		select {
-		case <-rightRound.C:
-			f = (f + 1) % len(baby)
-			mu.Lock()
-			u.now = baby[f]
-			out.writeAll(clear, save, []byte(u.now), load)
-			mu.Unlock()
-		case <-u.stop:
-			rightRound.Stop()
+		case b := <-recv:
+			bs = update(bs, b)
+		case send <- b:
+			if len(bs) > 0 {
+				bs = bs[1:]
+			}
 		}
 	}
 }
 
-// init sets up globals and a goroutine to catch interrupts.
-func init() {
-	o := terminal.IsTerminal(int(os.Stdout.Fd()))
-	e := terminal.IsTerminal(int(os.Stderr.Fd()))
-	switch {
-	case o && e:
-		Stdout = &blockingWriter{os.Stdout}
-		Stderr = &blockingWriter{os.Stderr}
-		out = &writer{os.Stdout}
-	case o:
-		Stdout = &blockingWriter{os.Stdout}
-		Stderr = os.Stderr
-		out = &writer{os.Stdout}
-	case e:
-		Stdout = os.Stdout
-		Stderr = &blockingWriter{os.Stderr}
-		out = &writer{os.Stderr}
-	default:
-		Stdout = os.Stdout
-		Stderr = os.Stderr
+func round(s Style, bars chan bar, stop, done chan struct{}) {
+	var (
+		frame string
+		clk   <-chan time.Time
+		sig   = make(chan os.Signal)
+		bs    = []bar{}
+	)
+
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+	os.Stderr.WriteString(hide)
+
+	draw := func() {
+		d := erase + frame
+		for _, b := range bs {
+			d += "\n" + b.k + " " + b.v
+		}
+		d += "\n\x1b[" + strconv.Itoa(len(bs)+1) + "A"
+		os.Stderr.WriteString(d)
 	}
 
-	sig := make(chan os.Signal)
-	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		<-sig
-		Stop()
-	}()
+	for {
+		if clk == nil {
+			f, d := s.Frame()
+			frame = f
+			draw()
+			clk = time.After(d)
+		}
+		select {
+		case <-clk:
+			clk = nil
+		case b := <-bars:
+			bs = update(bs, b)
+		case <-stop:
+			os.Stderr.WriteString(erase + show)
+			close(done)
+			return
+		case <-sig:
+			os.Stderr.WriteString(erase + show)
+			close(done)
+			return
+		}
+	}
+}
+
+// Go starts a spinner on stderr with the given style. Any running spinner will
+// be stopped.
+func Go(s Style) {
+	if !enabled {
+		return
+	}
+	Stop()
+	sc, dc := make(chan struct{}), make(chan struct{})
+	stop = func() {
+		select {
+		case sc <- struct{}{}:
+		case <-dc:
+		}
+		<-dc
+	}
+
+	go round(s, bars, sc, dc)
+}
+
+func Progress(k, v string) {
+	if progress == nil {
+		recv := make(chan bar)
+		progress = func(b bar) {
+			recv <- b
+		}
+		go pass(recv, bars)
+	}
+	progress(bar{k, v})
+}
+
+// Stop stops any running spinner.
+func Stop() {
+	if stop == nil {
+		return
+	}
+	stop()
+}
+
+//type Reader struct {
+//io.Reader
+//Label string
+//}
+
+//func (r *Reader) Read(p []byte) (int, error) {
+//n, err := r.Reader.Read(p)
+//}
+
+func getpos(t *term.Term) (int, int, error) {
+	if err := t.SetCbreak(); err != nil {
+		return -1, -1, err
+	}
+	t.Write([]byte("\x1b[6n"))
+	var r, c int
+	n, err := fmt.Fscanf(t, "\x1b[%d;%dR", &r, &c)
+	if err != nil {
+		return -1, -1, err
+	}
+	if n != 2 {
+		return -1, -1, fmt.Errorf("bad scan n=%d", n)
+	}
+	return r, c
+}
+
+func ttyname() (string, error) {
+	info, err := os.Stderr.Stat()
+	if err != nil {
+		return "not a tty", fmt.Errorf("stat stderr: %s", err)
+	}
+	sys, ok := info.Sys().(*syscall.Stat_t)
+	if !ok {
+		return "not a tty", fmt.Errorf("stat stderr: not Stat_t (%T)", info.Sys())
+	}
+	dev := sys.Rdev
+	match := ""
+
+	wf := func(path string, info os.FileInfo, err error) error {
+		if match != "" {
+			return filepath.SkipDir
+		}
+
+		rel, _ := filepath.Rel("/dev", path)
+		dir, _ := filepath.Split(rel)
+		if !(dir == "" || dir == "/pts") {
+			return filepath.SkipDir
+		}
+
+		sys, ok := info.Sys().(*syscall.Stat_t)
+		if !ok {
+			return nil
+		}
+		if sys.Rdev != dev {
+			return nil
+		}
+
+		match = path
+		return filepath.SkipDir
+	}
+
+	if err := filepath.Walk("/dev", wf); err != nil {
+		return "not a tty", fmt.Errorf("walk /dev: %s", err)
+	}
+
+	if match == "" {
+		return "not a tty", nil
+	}
+	return match, nil
 }

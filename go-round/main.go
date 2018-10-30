@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/dedelala/round"
-	"github.com/dedelala/sysexits"
 )
 
 func usage() {
@@ -34,17 +35,28 @@ Usage: %[1]v [options] [scroll|bounce] [message...]
 }
 
 func main() {
-	round.Go(divineStyle())
-	if _, err := io.Copy(round.Stdout, os.Stdin); err != nil {
-		fmt.Fprintln(round.Stderr, err)
+	round.Go(style())
+
+	sig := make(chan os.Signal)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		<-sig
+		round.Stop()
+		os.Exit(130)
+	}()
+
+	_, err := io.Copy(os.Stdout, os.Stdin)
+	if err != nil {
+		fmt.Fprint(os.Stderr, err)
 	}
 	round.Stop()
 }
 
-func divineStyle() round.Style {
+func style() round.Style {
 	flag.Usage = usage
 	w := flag.Int("w", 8, "field width of a scroller or bouncer")
-	f := flag.String("f", "[%v]", "format for a scroller or bouncer frame")
+	f := flag.String("f", "[%s]", "format for a scroller or bouncer frame")
 	flag.Parse()
 
 	if flag.NArg() == 0 {
@@ -59,9 +71,11 @@ func divineStyle() round.Style {
 	switch flag.Arg(0) {
 	case "help":
 		flag.Usage()
-		os.Exit(sysexits.Usage)
+		os.Exit(2)
 	case "block":
 		return round.Block
+	case "circle":
+		return round.Circle
 	case "cylon":
 		return round.Cylon
 	case "hearts":
@@ -70,16 +84,16 @@ func divineStyle() round.Style {
 		return round.Moon
 	case "pipe":
 		return round.Pipe
+	case "wave":
+		return round.Wave
 	case "bounce":
-		if *w < 0 {
-			return round.NewInvertedBouncer(-*w, *f, msg)
-		}
-		return round.NewBouncer(*w, *f, msg)
+		return round.NewBounce(*w, *f, msg)
 	case "scroll":
-		if *w < 0 {
-			return round.NewInvertedScroller(-*w, *f, msg)
-		}
-		return round.NewScroller(*w, *f, msg)
+		return round.NewRtL(*w, *f, msg)
+	case "rtl":
+		return round.NewRtL(*w, *f, msg)
+	case "ltr":
+		return round.NewLtR(*w, *f, msg)
 	}
 
 	return round.Pipe
